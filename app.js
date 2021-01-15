@@ -100,7 +100,7 @@ const checkStock = async (page) => {
     }
 };
 
-app.get('/', (req, res) => {
+app.get('/check', (req, res) => {
     res.send(stock);
 });
 
@@ -112,8 +112,7 @@ app.listen(port, () => {
         const browser = await puppeteer.launch(options);
         const page = await browser.newPage();
 
-        await checkStock(page);
-        schedule.scheduleJob('*/5 * * * *', async () => {
+        schedule.scheduleJob('*/1 * * * *', async () => {
             await checkStock(page);
         });
 
