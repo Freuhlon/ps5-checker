@@ -1,28 +1,13 @@
-const puppeteer = require('puppeteer');
-const schedule = require('node-schedule');
 const express = require('express');
+const puppeteer = require('puppeteer-extra')
+
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+puppeteer.use(StealthPlugin())
 
 const app = express();
 const port = 80;
 
 let stock = [];
-
-const args = [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-infobars',
-    '--window-position=0,0',
-    '--ignore-certifcate-errors',
-    '--ignore-certifcate-errors-spki-list',
-    '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3312.0 Safari/537.36"'
-];
-
-const options = {
-    args,
-    headless: true,
-    ignoreHTTPSErrors: true,
-    userDataDir: './tmp'
-};
 
 const data = {
     set: "PS5",
@@ -63,12 +48,32 @@ const data = {
 
 
 
-const checkStock = async (page) => {
+const checkStock = async () => {
     stock = [];
-    for (const site of data.sites) {
+
+    let cptStock = 0;
+    do {
+
+        if( cptStock === data.sites.length) {
+            stock = [];
+            cptStock = 0;
+        }
+        const site = data.sites[cptStock];
+
+        const browser = await puppeteer.launch({ headless: true });
+        const page = await browser.newPage()
+        await page.setExtraHTTPHeaders({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en-US,q=0.9',
+            'Cache-Control': 'none',
+        })
         await page.goto(site.url, {
             waitUntil: 'networkidle0',
         });
+
+        await sleep(30000);
+        await page.screenshot({ path: 'testresult.png', fullPage: true });
 
         try {
             const innerHtml = await page.$eval(site.query, div => div.innerText);
@@ -96,8 +101,10 @@ const checkStock = async (page) => {
                 available: 'Error'
             })
         }
+        await browser.close();
+        cptStock++;
+    } while(true);
 
-    }
 };
 
 app.get('/check', (req, res) => {
@@ -109,12 +116,15 @@ app.listen(port, () => {
     console.log(`Application de check de stock écoute sur http://localhost:${port}`);
 
     (async () => {
-        const browser = await puppeteer.launch(options);
-        const page = await browser.newPage();
 
-        schedule.scheduleJob('*/1 * * * *', async () => {
-            await checkStock(page);
-        });
+        await checkStock();
 
     })();
 });
+
+
+function sleep(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
